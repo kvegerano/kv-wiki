@@ -344,3 +344,43 @@ def test_ingest_code_file_not_in_manifest_refused(tmp_path):
     with pytest.raises(SystemExit) as exc_info:
         cmd_ingest(args)
     assert exc_info.value.code == 2
+
+
+# ---------------------------------------------------------------------------
+# 9. _append_changelog_entry_ingest: creates ## Changelog section if missing
+# ---------------------------------------------------------------------------
+
+
+def test_append_creates_changelog_section_if_missing(tmp_path):
+    """Feature page with no ## Changelog section gets one created."""
+    from helper import _append_changelog_entry_ingest
+
+    page = tmp_path / "my-feature.md"
+    page.write_text("---\ntitle: My Feature\n---\n\n# Body\n", encoding="utf-8")
+
+    source = tmp_path / "foo.py"
+    source.write_text("# src\n", encoding="utf-8")
+
+    _append_changelog_entry_ingest(page, source)
+
+    text = page.read_text(encoding="utf-8")
+    assert "## Changelog" in text
+    assert "manual ingest" in text
+
+
+# ---------------------------------------------------------------------------
+# 10. validate_manifest: invalid slug causes run() to return 1
+# ---------------------------------------------------------------------------
+
+
+def test_hook_invalid_manifest_returns_error(tmp_path):
+    """run() with a bad slug returns exit code 1."""
+    manifest = tmp_path / ".kv-wiki-features.yaml"
+    manifest.write_text("features:\n  - slug: INVALID_SLUG\n    globs: []\n", encoding="utf-8")
+    wiki_root = tmp_path / "docs" / "wiki"
+
+    with pytest.raises(ValueError, match="Invalid slug"):
+        validate_manifest({"features": [{"slug": "INVALID_SLUG", "globs": []}]})
+
+    rc = run(tmp_path, wiki_root)
+    assert rc == 1

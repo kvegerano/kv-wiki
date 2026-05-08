@@ -55,6 +55,19 @@ def _load_manifest(project_root: Path) -> dict | None:
         return yaml.safe_load(fh) or {}
 
 
+def validate_manifest(manifest: dict) -> None:
+    """Raise ValueError if any entry has an invalid slug or unsafe glob."""
+    for entry in manifest.get("features", []):
+        slug = entry.get("slug", "")
+        if not SLUG_RE.match(slug):
+            raise ValueError(f"Invalid slug: {slug!r}")
+        for glob in entry.get("globs", []):
+            if ".." in glob:
+                raise ValueError(f"Glob contains '..': {glob!r}")
+            if glob.startswith("/"):
+                raise ValueError(f"Glob has leading '/': {glob!r}")
+
+
 def _file_matches_manifest(rel_source: str, manifest: dict) -> str | None:
     """Return the slug of the first matching feature, or None."""
     for entry in manifest.get("features", []):
@@ -138,20 +151,27 @@ def _append_changelog_entry_ingest(
     lines = content.splitlines(keepends=True)
     stripped = [l.rstrip("\n").rstrip("\r") for l in lines]
 
+    dedup_key = f"<!-- ingest:{source_path.name}:{date.today().isoformat()} -->"
+
     entry = (
         f"- manual ingest {date.today().isoformat()} — source: {source_path.as_posix()}\n"
     )
 
     changelog_start = _find_changelog_section(stripped)
     if changelog_start != -1:
+        section_text = "".join(lines[changelog_start:])
+        if dedup_key in section_text:
+            return
         insert_at = changelog_start
         if insert_at < len(stripped) and stripped[insert_at] == "":
             insert_at += 1
         lines.insert(insert_at, entry)
+        lines.insert(insert_at, dedup_key + "\n")
     else:
         if lines and not lines[-1].endswith("\n"):
             lines.append("\n")
         lines.append("\n## Changelog\n")
+        lines.append(dedup_key + "\n")
         lines.append(entry)
 
     _atomic_write_text(feature_page, "".join(lines))
@@ -278,6 +298,11 @@ def cmd_ingest(args: argparse.Namespace) -> int:
     if source.suffix in CODE_EXTENSIONS and project_root is not None:
         manifest = _load_manifest(project_root)
         if manifest is not None:
+            try:
+                validate_manifest(manifest)
+            except ValueError as exc:
+                print(f"error: manifest validation failed: {exc}", file=sys.stderr)
+                return 1
             # Compute relative path for glob matching.
             try:
                 rel = source.resolve().relative_to(project_root.resolve()).as_posix()
