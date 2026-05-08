@@ -1,9 +1,8 @@
 #!/usr/bin/env python3
 """wiki-query helper CLI.
 
-Offers two subcommands:
+Offers one subcommand:
 - `search` — rank wiki pages by keyword match count for a given query
-- `cite` — format a (page, section) pair as a citation string
 
 The heavy lifting (synthesising an answer from the top pages) is done by the
 model reading the SKILL.md instructions. This helper is retrieval-only.
@@ -58,6 +57,7 @@ def search(wiki_root: Path, query: str, top_k: int = 5) -> list[Hit]:
             continue
         # Pull the title from frontmatter if present; otherwise filename.
         title = page.stem
+        content = content.lstrip("﻿")
         if content.startswith("---"):
             end = content.find("\n---\n", 4)
             if end != -1:
