@@ -69,7 +69,8 @@ def run(templates_dir: Path, target_dir: Path, dry_run: bool) -> int:
             )
             differed += 1
 
-    print(f"Bootstrap complete: {created} created, {skipped} skipped, {differed} differed.")
+    verb = "would create" if dry_run else "created"
+    print(f"Bootstrap complete: {created} {verb}, {skipped} skipped, {differed} differed.")
     return 0
 
 
