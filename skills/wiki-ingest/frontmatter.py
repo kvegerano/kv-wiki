@@ -86,6 +86,7 @@ def parse(content: str) -> tuple[dict[str, Any], str]:
     Returns (frontmatter_dict, body_str). Raises InvalidFrontmatterError on
     any schema violation.
     """
+    content = content.replace('\r\n', '\n').replace('\r', '\n')
     if not content.startswith("---\n"):
         raise InvalidFrontmatterError("missing frontmatter: content must start with '---'")
     end = content.find("\n---\n", 4)

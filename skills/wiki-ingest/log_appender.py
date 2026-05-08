@@ -1,8 +1,30 @@
 """Append entries to docs/wiki/log.md."""
 from __future__ import annotations
 
+import os
+import tempfile
 from datetime import date
 from pathlib import Path
+
+
+def _atomic_write(path: Path, text: str) -> None:
+    tmp = tempfile.NamedTemporaryFile(
+        mode='w', dir=str(path.parent), suffix='.tmp',
+        delete=False, encoding='utf-8',
+    )
+    try:
+        tmp.write(text)
+        tmp.flush()
+        os.fsync(tmp.fileno())
+        tmp.close()
+        os.replace(tmp.name, str(path))
+    except Exception:
+        tmp.close()
+        try:
+            os.unlink(tmp.name)
+        except OSError:
+            pass
+        raise
 
 
 def append_entry(
@@ -28,7 +50,7 @@ def append_entry(
     entry_block = "\n".join(entry_lines)
 
     if not log_path.exists():
-        log_path.write_text(f"# Wiki Log\n\n{header_line}\n{entry_block}\n")
+        _atomic_write(log_path, f"# Wiki Log\n\n{header_line}\n{entry_block}\n")
         return
 
     content = log_path.read_text()
@@ -39,8 +61,8 @@ def append_entry(
         if next_heading == -1:
             new = content.rstrip() + f"\n{entry_block}\n"
         else:
-            new = content[:next_heading] + f"{entry_block}\n" + content[next_heading + 1:]
-        log_path.write_text(new)
+            new = content[:next_heading] + f"{entry_block}\n\n" + content[next_heading + 1:]
+        _atomic_write(log_path, new)
         return
 
     lines = content.splitlines()
@@ -53,4 +75,4 @@ def append_entry(
             break
     new_block = [header_line, entry_block, ""]
     lines[insert_at:insert_at] = new_block
-    log_path.write_text("\n".join(lines) + "\n")
+    _atomic_write(log_path, "\n".join(lines) + "\n")

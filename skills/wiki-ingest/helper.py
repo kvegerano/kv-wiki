@@ -11,7 +11,6 @@ pure file-manipulator; it never reads model output or calls external services.
 from __future__ import annotations
 
 import argparse
-import hashlib
 import os
 import re
 import subprocess
@@ -71,10 +70,6 @@ def _validate_and_resolve_page_path(
     return candidate
 
 
-def _sha256(data: bytes) -> str:
-    return hashlib.sha256(data).hexdigest()
-
-
 def _atomic_write(target_path: Path, content: bytes) -> None:
     """Write content to target_path atomically via tempfile + os.replace()."""
     tmp = tempfile.NamedTemporaryFile(
@@ -104,21 +99,18 @@ def _atomic_write_text(target_path: Path, content: str) -> None:
 
 
 def _write_page_atomic(
-    wiki_root: Path,
-    bucket: str,
-    slug: str,
+    page_path: Path,
     content: bytes,
     create: bool,
 ) -> None:
-    """Write <wiki_root>/<bucket>/<slug>.md atomically.
+    """Write page_path atomically.
 
     Uses tempfile.NamedTemporaryFile in the same directory + os.replace().
     If create=True and the file already exists, raises FileExistsError.
     """
-    target = wiki_root / bucket / f"{slug}.md"
-    if create and target.exists():
-        raise FileExistsError(f"page already exists: {target}")
-    _atomic_write(target, content)
+    if create and page_path.exists():
+        raise FileExistsError(f"page already exists: {page_path}")
+    _atomic_write(page_path, content)
 
 
 def _canonicalize_source(source: Path, project_root: Path) -> str:
@@ -165,14 +157,13 @@ def _refuse_if_code(source: Path) -> None:
 
 
 def _create_page(
-    wiki_root: Path,
+    page_path: Path,
     bucket: str,
-    slug: str,
     title: str,
     summary: str,
     rel_source: str,
     page_type: str = DEFAULT_TYPE,
-) -> Path:
+) -> None:
     today = date.today().isoformat()
     fm = {
         "title": title,
@@ -188,19 +179,17 @@ def _create_page(
     }
     body = f"\n{summary}\n"
     content = serialize(fm, body).encode("utf-8")
-    _write_page_atomic(wiki_root, bucket, slug, content, create=True)
-    page = wiki_root / bucket / f"{slug}.md"
-    return page
+    _write_page_atomic(page_path, content, create=True)
 
 
-def _update_page(page: Path, wiki_root: Path, bucket: str, slug: str, rel_source: str, summary: str) -> None:
-    fm, body = parse(page.read_text())
+def _update_page(page_path: Path, rel_source: str, summary: str) -> None:
+    fm, body = parse(page_path.read_text())
     if rel_source not in fm["sources"]:
         fm["sources"].append(rel_source)
-    fm["updated"] = date.today()
+    fm["updated"] = date.today().isoformat()
     new_body = body.rstrip() + f"\n\n- {date.today().isoformat()}: {summary}\n"
     content = serialize(fm, new_body).encode("utf-8")
-    _write_page_atomic(wiki_root, bucket, slug, content, create=False)
+    _write_page_atomic(page_path, content, create=False)
 
 
 @contextmanager
@@ -243,7 +232,7 @@ def cmd_ingest(args: argparse.Namespace) -> int:
         print(f"error: {exc}", file=sys.stderr)
         return 2
 
-    (wiki_root / args.bucket_hint).mkdir(parents=False, exist_ok=True)
+    page_path.parent.mkdir(parents=False, exist_ok=True)
 
     page_type = getattr(args, "type", DEFAULT_TYPE) or DEFAULT_TYPE
     if page_type not in VALID_TYPES:
@@ -279,13 +268,12 @@ def cmd_ingest(args: argparse.Namespace) -> int:
                     )
                     return 2
 
-                _update_page(page_path, wiki_root, bucket, slug, rel_source, args.summary)
+                _update_page(page_path, rel_source, args.summary)
                 changes.append(f"Updated: {bucket}/{slug}.md")
             else:
                 _create_page(
-                    wiki_root,
+                    page_path,
                     bucket,
-                    slug,
                     args.title,
                     args.summary,
                     rel_source,
