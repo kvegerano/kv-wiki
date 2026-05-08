@@ -11,6 +11,7 @@ pure file-manipulator; it never reads model output or calls external services.
 from __future__ import annotations
 
 import argparse
+import fnmatch
 import os
 import re
 import subprocess
@@ -19,6 +20,8 @@ import tempfile
 from contextlib import contextmanager
 from datetime import date
 from pathlib import Path
+
+import yaml
 
 import portalocker
 
@@ -39,6 +42,26 @@ CODE_EXTENSIONS = {".py", ".ts", ".tsx", ".js", ".jsx", ".svelte", ".go", ".rs",
 DEFAULT_TYPE = "decision"
 
 SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9-]{0,63}$")
+
+MANIFEST_FILENAME = ".kv-wiki-features.yaml"
+
+
+def _load_manifest(project_root: Path) -> dict | None:
+    """Return parsed manifest dict, or None if absent."""
+    manifest_path = project_root / MANIFEST_FILENAME
+    if not manifest_path.exists():
+        return None
+    with open(manifest_path, "r", encoding="utf-8") as fh:
+        return yaml.safe_load(fh) or {}
+
+
+def _file_matches_manifest(rel_source: str, manifest: dict) -> str | None:
+    """Return the slug of the first matching feature, or None."""
+    for entry in manifest.get("features", []):
+        for glob in entry.get("globs", []):
+            if fnmatch.fnmatch(rel_source, glob):
+                return entry.get("slug")
+    return None
 
 
 def _validate_and_resolve_page_path(
@@ -96,6 +119,42 @@ def _atomic_write(target_path: Path, content: bytes) -> None:
 def _atomic_write_text(target_path: Path, content: str) -> None:
     """Write text content atomically via tempfile + os.replace()."""
     _atomic_write(target_path, content.encode("utf-8"))
+
+
+def _find_changelog_section(lines: list[str]) -> int:
+    """Return the index of the line after '## Changelog', or -1."""
+    for i, line in enumerate(lines):
+        if line.strip() == "## Changelog":
+            return i + 1
+    return -1
+
+
+def _append_changelog_entry_ingest(
+    feature_page: Path,
+    source_path: Path,
+) -> None:
+    """Append a changelog entry for a manual wiki-ingest invocation on a code file."""
+    content = feature_page.read_text(encoding="utf-8")
+    lines = content.splitlines(keepends=True)
+    stripped = [l.rstrip("\n").rstrip("\r") for l in lines]
+
+    entry = (
+        f"- manual ingest {date.today().isoformat()} — source: {source_path.as_posix()}\n"
+    )
+
+    changelog_start = _find_changelog_section(stripped)
+    if changelog_start != -1:
+        insert_at = changelog_start
+        if insert_at < len(stripped) and stripped[insert_at] == "":
+            insert_at += 1
+        lines.insert(insert_at, entry)
+    else:
+        if lines and not lines[-1].endswith("\n"):
+            lines.append("\n")
+        lines.append("\n## Changelog\n")
+        lines.append(entry)
+
+    _atomic_write_text(feature_page, "".join(lines))
 
 
 def _write_page_atomic(
@@ -213,6 +272,30 @@ def cmd_ingest(args: argparse.Namespace) -> int:
     if not source.exists():
         print(f"error: source not found: {source}", file=sys.stderr)
         return 2
+
+    # Check manifest before code-file guard: if the source matches a manifest
+    # entry, append a changelog entry to the feature page and exit 0.
+    if source.suffix in CODE_EXTENSIONS and project_root is not None:
+        manifest = _load_manifest(project_root)
+        if manifest is not None:
+            # Compute relative path for glob matching.
+            try:
+                rel = source.resolve().relative_to(project_root.resolve()).as_posix()
+            except ValueError:
+                rel = None
+            if rel is not None:
+                matched_slug = _file_matches_manifest(rel, manifest)
+                if matched_slug is not None:
+                    feature_page = wiki_root / "features" / f"{matched_slug}.md"
+                    if not feature_page.exists():
+                        print(
+                            f"error: no feature page for slug {matched_slug!r} ({feature_page})",
+                            file=sys.stderr,
+                        )
+                        return 2
+                    _append_changelog_entry_ingest(feature_page, source)
+                    print(f"wiki-ingest: appended changelog entry to features/{matched_slug}.md")
+                    return 0
 
     _refuse_if_code(source)
 
