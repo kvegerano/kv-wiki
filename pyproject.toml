@@ -1,0 +1,23 @@
+[build-system]
+requires = ["hatchling==1.29.0"]
+build-backend = "hatchling.build"
+
+[project]
+name = "kv-wiki"
+version = "0.1.0"
+description = "Karpathy LLM-wiki skills for Claude Code"
+requires-python = ">=3.11"
+dependencies = [
+    "portalocker==3.2.0",
+    "pyyaml==6.0.3",
+    "pydantic==2.13.4",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest==9.0.3",
+    "pytest-cov==7.1.0",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/kv_wiki"]

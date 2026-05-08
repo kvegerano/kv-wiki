@@ -1,0 +1,10 @@
+{
+  "name": "kv-wiki",
+  "version": "0.1.0",
+  "description": "Karpathy LLM-wiki skills for Claude Code",
+  "author": {
+    "name": "Kristian Vegerano",
+    "url": "https://github.com/kvegerano"
+  },
+  "license": "MIT"
+}
