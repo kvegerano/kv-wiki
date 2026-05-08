@@ -1,0 +1,20 @@
+# kv-wiki feature tracking manifest
+# Maps feature slugs to the code files that implement them.
+# When a matched file changes, the post-commit hook appends a changelog entry
+# to the corresponding feature wiki page.
+#
+# Format:
+#   - slug: <kebab-case-slug>   # must match docs/wiki/features/<slug>.md
+#     globs:
+#       - path/to/file.py
+#       - path/to/directory/**
+#
+# Example (commented out):
+# features:
+#   - slug: latte-pour-cashflow
+#     globs:
+#       - backend/app/services/cashflow.py
+#       - backend/app/routers/cashflow.py
+#       - frontend/src/routes/latte-pour/**
+#
+features: []

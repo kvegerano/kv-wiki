@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python ${CLAUDE_PLUGIN_ROOT}/skills/wiki-ingest/helper.py ingest --wiki-root docs/wiki --source $TOOL_INPUT_PATH --project-root ."
+          }
+        ]
+      }
+    ]
+  }
+}

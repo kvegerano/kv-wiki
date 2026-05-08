@@ -1,0 +1,3 @@
+# kv-wiki
+.wiki.lock
+docs/wiki/**/*.tmp
