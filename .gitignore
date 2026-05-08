@@ -7,3 +7,15 @@ dist/
 build/
 .venv/
 *.tmp
+
+# Environment files
+.env
+.env.*
+.env*.local
+
+# Tool caches
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+.coverage
+htmlcov/

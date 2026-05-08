@@ -21,3 +21,6 @@ dev = [
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/kv_wiki"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

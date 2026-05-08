@@ -6,5 +6,9 @@
     "name": "Kristian Vegerano",
     "url": "https://github.com/kvegerano"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "skills": [],
+  "commands": [],
+  "hooks": [],
+  "rules": []
 }
