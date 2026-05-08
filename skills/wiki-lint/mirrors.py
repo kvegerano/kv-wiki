@@ -53,7 +53,7 @@ def load(path: Path) -> MirrorMap:
     if not path.exists():
         return MirrorMap()
     try:
-        raw = json.loads(path.read_text())
+        raw = json.loads(path.read_text(encoding="utf-8").lstrip("﻿"))
     except json.JSONDecodeError as e:
         raise InvalidMirrorMapError(f"{path}: invalid JSON — {e}") from e
     if not isinstance(raw, dict):

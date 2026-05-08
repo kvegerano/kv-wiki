@@ -58,11 +58,22 @@ def find_stale(wiki_root: Path, stale_days: int) -> list[StaleFinding]:
             fm, _ = parse(content)
         except InvalidFrontmatterError:
             continue
-        updated_val = fm["updated"]
+        updated_val = fm.get("updated")
+        if updated_val is None or updated_val == "":
+            findings.append(
+                StaleFinding(path=str(page), days_old=-1, threshold=stale_days)
+            )
+            continue
         if isinstance(updated_val, date):
             updated = updated_val
         else:
-            updated = _parse_date(str(updated_val))
+            try:
+                updated = _parse_date(str(updated_val))
+            except ValueError:
+                findings.append(
+                    StaleFinding(path=str(page), days_old=-1, threshold=stale_days)
+                )
+                continue
         days_old = (today - updated).days
         if days_old > stale_days:
             findings.append(
@@ -303,8 +314,8 @@ def cmd_lint(args: argparse.Namespace) -> int:
                 {"kind": c.kind, "detail": c.detail}
                 for c in contradictions
             ],
-            "summary": {"total_issues": total},
         }
+        result["summary"] = {"total_issues": sum(len(v) for v in result.values() if isinstance(v, list))}
         print(json.dumps(result))
         return 0 if total == 0 else 1
 
