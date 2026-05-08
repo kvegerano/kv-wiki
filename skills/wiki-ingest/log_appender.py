@@ -53,7 +53,7 @@ def append_entry(
         _atomic_write(log_path, f"# Wiki Log\n\n{header_line}\n{entry_block}\n")
         return
 
-    content = log_path.read_text()
+    content = log_path.read_text(encoding='utf-8')
 
     if header_line in content:
         start = content.index(header_line) + len(header_line) + 1
